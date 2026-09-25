@@ -1,0 +1,25 @@
+---
+- name: Link Source Account to Central OAM Sink
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    aws_region: "us-east-1"
+    # Central Monitoring Account Sink ARN generated from Playbook 01
+    central_sink_arn: "arn:aws:oam:us-east-1:111111111111:sink/abc-1234-def5-6789"
+    link_label_template: "$AccountName"
+
+  tasks:
+    - name: Create OAM Link in Source Account
+      amazon.aws.aws_cli:
+        command: >
+          oam create-link
+          --label-template "{{ link_label_template }}"
+          --resource-types "AWS::CloudWatch::Metric"
+          --sink-identifier "{{ central_sink_arn }}"
+          --region {{ aws_region }}
+      register: oam_link_result
+
+    - name: Display Link Status
+      ansible.builtin.debug:
+        msg: "Source account successfully linked to central sink: {{ oam_link_result.stdout }}"

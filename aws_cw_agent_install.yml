@@ -1,0 +1,53 @@
+---
+- name: Install and Configure CloudWatch Agent for Disk Monitoring
+  hosts: aws_ec2
+  become: true
+  tasks:
+    - name: Download Amazon CloudWatch Agent RPM (RedHat/Amazon Linux)
+      ansible.builtin.get_url:
+        url: "https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm"
+        dest: "/tmp/amazon-cloudwatch-agent.rpm"
+        mode: "0644"
+      when: ansible_os_family == "RedHat"
+
+    - name: Install CloudWatch Agent RPM Package
+      ansible.builtin.yum:
+        name: "/tmp/amazon-cloudwatch-agent.rpm"
+        state: present
+        disable_gpg_check: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Download Amazon CloudWatch Agent DEB (Ubuntu/Debian)
+      ansible.builtin.get_url:
+        url: "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
+        dest: "/tmp/amazon-cloudwatch-agent.deb"
+        mode: "0644"
+      when: ansible_os_family == "Debian"
+
+    - name: Install CloudWatch Agent DEB Package
+      ansible.builtin.apt:
+        deb: "/tmp/amazon-cloudwatch-agent.deb"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Deploy CloudWatch Agent Disk Configuration
+      ansible.builtin.template:
+        src: "../templates/cw_agent_config.json.j2"
+        dest: "/opt/aws/amazon-cloudwatch-agent/bin/config.json"
+        mode: "0644"
+
+    - name: Start and Enable CloudWatch Agent Service
+      ansible.builtin.command: >
+        /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl
+        -a fetch-config
+        -m ec2
+        -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json
+        -s
+      register: agent_status
+      changed_when: "'Successfully fetched the config' in agent_status.stdout"
+
+    - name: Ensure CloudWatch Agent Service is running
+      ansible.builtin.service:
+        name: amazon-cloudwatch-agent
+        state: started
+        enabled: true
