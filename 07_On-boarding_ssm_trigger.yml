@@ -1,0 +1,32 @@
+---
+- name: Onboard Newly Discovered EC2 Instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    aws_region: "us-east-1"
+    ssm_doc_name: "InstallAndConfigureCloudWatchAgent"
+
+  tasks:
+    - name: Extract target instance IDs from dynamic inventory
+      ansible.builtin.set_fact:
+        target_instance_ids: "{{ groups['all'] | map('extract', hostvars, 'ansible_host') | list }}"
+
+    - name: Display instances queued for CloudWatch agent installation
+      ansible.builtin.debug:
+        msg: "Targeting instances: {{ target_instance_ids }}"
+
+    - name: Trigger SSM Document on discovered instances
+      amazon.aws.aws_ssm_run_command:
+        document_name: "{{ ssm_doc_name }}"
+        targets:
+          - key: "InstanceIds"
+            values: "{{ target_instance_ids }}"
+        parameters:
+          ConfigSSMParamName: ["AmazonCloudWatch-linux"]
+        region: "{{ aws_region }}"
+      register: ssm_execution
+
+    - name: Display SSM Execution Command ID
+      ansible.builtin.debug:
+        msg: "SSM Run Command triggered successfully. Command ID: {{ ssm_execution.command.command_id }}"

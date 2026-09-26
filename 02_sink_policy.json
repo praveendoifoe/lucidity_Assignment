@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+           
+                    "arn:aws:iam::{{ account_id }}:root"
+        ]
+      },
+      "Action": [
+        "oam:CreateLink",
+        "oam:UpdateLink"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ForAllValues:StringEquals": {
+          "oam:ResourceTypes": [
+            "AWS::CloudWatch::Metric"
+          ]
+        }
+      }
+    }
+  ]
+}

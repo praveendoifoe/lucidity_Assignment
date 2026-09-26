@@ -1,0 +1,53 @@
+---
+- name: Create SSM Document for CloudWatch Agent Installation
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    aws_region: "us-east-1"
+    ssm_doc_name: "InstallAndConfigureCloudWatchAgent"
+
+  tasks:
+    - name: Create or Update SSM Command Document for CloudWatch Agent
+      amazon.aws.ssm_document:
+        name: "{{ ssm_doc_name }}"
+        state: present
+        document_type: "Command"
+        document_format: "YAML"
+        region: "{{ aws_region }}"
+        content: |
+          schemaVersion: '2.2'
+          description: 'Install and start AWS CloudWatch Agent on Linux instances.'
+          parameters:
+            ConfigSSMParamName:
+              type: String
+              description: 'SSM Parameter Store name containing the CloudWatch Agent JSON config.'
+              default: 'AmazonCloudWatch-linux'
+          mainSteps:
+            - action: 'aws:runShellScript'
+              name: 'InstallAndStartCloudWatchAgent'
+              inputs:
+                timeoutSeconds: '300'
+                runCommand:
+                  - '#!/bin/bash'
+                  - 'set -e'
+                  - 'echo "=== Checking / Installing CloudWatch Agent ==="'
+                  - 'if ! command -v amazon-cloudwatch-agent-ctl &> /dev/null; then'
+                  - '    if command -v yum &> /dev/null; then'
+                  - '        yum install -y amazon-cloudwatch-agent || ('
+                  - '            curl -O https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm &&'
+                  - '            rpm -U ./amazon-cloudwatch-agent.rpm'
+                  - '        )'
+                  - '    elif command -v apt-get &> /dev/null; then'
+                  - '        curl -O https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb &&'
+                  - '        dpkg -i -E ./amazon-cloudwatch-agent.deb'
+                  - '    fi'
+                  - 'fi'
+                  - ''
+                  - 'echo "=== Fetching Config and Starting CloudWatch Agent ==="'
+                  - '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \'
+                  - '    -a fetch-config \'
+                  - '    -m ec2 \'
+                  - '    -c ssm:{{ ConfigSSMParamName }} \'
+                  - '    -s'
+                  - 'echo "=== CloudWatch Agent successfully started ==="'
