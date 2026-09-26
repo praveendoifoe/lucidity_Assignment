@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Provisions a cross-account IAM role for Ansible dynamic inventory discovery.'
+
+Parameters:
+  CentralAccountId:
+    Type: String
+    Description: 'The 12-digit AWS Account ID of the central Ansible control node.'
+    AllowedPattern: '^\d{12}$'
+    ConstraintDescription: 'Must be a valid 12-digit AWS Account ID.'
+    Default: '000000000000'
+
+  RoleName:
+    Type: String
+    Description: 'The name of the cross-account IAM role.'
+    Default: 'AnsibleInventoryDiscoveryRole'
+
+Resources:
+  AnsibleDiscoveryRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Ref RoleName
+      Description: 'Allows central Ansible node to discover EC2 instances via sts:AssumeRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${CentralAccountId}:root'
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess'
+      Tags:
+        - Key: Environment
+          Value: Management
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Purpose
+          Value: AnsibleInventoryDiscovery
+
+Outputs:
+  CrossAccountRoleArn:
+    Description: 'ARN of the cross-account IAM role to configure in Ansible profiles'
+    Value: !GetAtt AnsibleDiscoveryRole.Arn
