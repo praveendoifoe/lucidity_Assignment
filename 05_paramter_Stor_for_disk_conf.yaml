@@ -1,0 +1,44 @@
+---
+- name: Provision CloudWatch Agent Disk Config in SSM Parameter Store
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    aws_region: "us-east-1"
+    ssm_param_name: "AmazonCloudWatch-linux"
+
+  tasks:
+    - name: Create or Update CloudWatch Disk Metric Configuration in SSM Parameter Store
+      amazon.aws.ssm_parameter:
+        name: "{{ ssm_param_name }}"
+        type: "String"
+        state: present
+        region: "{{ aws_region }}"
+        description: "Centralized CloudWatch Agent disk monitoring configuration for Linux instances"
+        overwrite: true
+        value: |
+          {
+            "agent": {
+              "metrics_collection_interval": 60,
+              "run_as_user": "root"
+            },
+            "metrics": {
+              "namespace": "CWAgent",
+              "append_dimensions": {
+                "InstanceId": "${aws:InstanceId}"
+              },
+              "metrics_collected": {
+                "disk": {
+                  "measurement": [
+                    "disk_used_percent",
+                    "disk_free",
+                    "disk_used"
+                  ],
+                  "metrics_collection_interval": 60,
+                  "resources": [
+                    "/"
+                  ]
+                }
+              }
+            }
+          }
